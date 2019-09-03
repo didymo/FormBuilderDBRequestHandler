@@ -57,35 +57,60 @@ else
 {
 	$id = rand();
 	$name = $body['name'];
-	$version = $body['version'];
+	$version = 1;
 	$file_dir = $body['filedir'];
 	$valid = $body['valid'];
 	$data = $body['contents'];
 	$hash = 'testing'; //this is hardcoded for now
 
-	$sql = "INSERT INTO UNCOMPLETED_SURVEY (id,version,form_name,file_directory,valid,data_dump)";
-	$sql .= "VALUES (".$id.",".$version.",";
-	$sql .= "'".$name."','".$file_dir."',".$valid.",'".$data."')";
-
-	$sql2 = "INSERT INTO PERMITTED_PATIENT_HASH (hash, id)";
-	$sql2 .= "VALUES ('".$hash."',".$id.")";
-
-	//$body['sql'] = $sql; //delete this! This is UNSAFE as the world can see it!
-	if (!$result = $db->query($sql))
+	$check_sql = "SELECT * FROM UNCOMPLETED_SURVEY WHERE form_name='".$name."'";
+	$result = $db->query($check_sql);
+	if (!$result)
 	{
-		//oh no, the query failed!
-		$body['response'] = "Error inserting form data into DB: ".$db->error;
+		//this REALLY shouldn't happen.
+		$body['response'] = "Error reading from the DB. Something is broken!".$db->error;
+		$failed = true;
 	}
-	if (!$result2 = $db->query($sql2))
+	else if ($result->num_rows > 0)
 	{
-		//oh no, the query failed!
-		$body['response'] = "Error inserting hash into DB: ".$db->error;
+		$version = $result->num_rows + 1;
 	}
-	else
-		$body['response'] = "Data inserted and hash added";
+
+	if (!$failed)
+	{
+
+		$sql = "INSERT INTO UNCOMPLETED_SURVEY (id,version,form_name,file_directory,valid,data_dump)";
+		$sql .= "VALUES (".$id.",".$version.",";
+		$sql .= "'".$name."','".$file_dir."',".$valid.",'".$data."')";
+
+		$sql2 = "INSERT INTO PERMITTED_PATIENT_HASH (hash, id)";
+		$sql2 .= "VALUES ('".$hash."',".$id.")";
+
+		//$body['sql'] = $sql; //delete this! This is UNSAFE as the world can see it!
+		if (!$result = $db->query($sql))
+		{
+			//oh no, the query failed!
+			$body['response'] = "Error inserting form data with id ".$id." and version ".$version." into DB: ".$db->error;
+			$failed = true;
+		}
+		else if (!$result2 = $db->query($sql2))
+		{
+			//oh no, the query failed!
+			$body['response'] = "Error inserting hash into DB: ".$db->error;
+			$failed = true;
+		}
+		else
+		{
+			$body['response'] = "Data inserted and hash added";
+			$failed = true;
+		}
+	}
 
 	echo json_encode($body);
-	http_response_code(200);
+	//if ($failed)
+		//http_response_code(500);
+	//else
+		http_response_code(200);
 }
 
 ?>
